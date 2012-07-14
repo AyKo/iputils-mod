@@ -59,9 +59,11 @@ char copyright[] =
  */
 
 #include "ping_common.h"
+#include "ether_util.h"
 
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
+#include <linux/if_ether.h> 
 
 #ifndef ICMP_FILTER
 #define ICMP_FILTER	1
@@ -69,7 +71,6 @@ struct icmp_filter {
 	__u32	data;
 };
 #endif
-
 
 #define	MAXIPLEN	60
 #define	MAXICMPLEN	76
@@ -112,6 +113,13 @@ struct sockaddr_in source;
 char *device;
 int pmtudisc = -1;
 
+int is_l2send = 0;			/* using -E option: specify destination mac-address */
+unsigned char dst_mac[6] = {};	/* destination mac-address */
+unsigned char src_mac[6] = {};	/* source mac-address */
+int icmp_l2_sock;			/* layer 2 socket file descriptor */
+int interface_index = -1;
+struct sockaddr_in src_ip;
+
 
 int
 main(int argc, char **argv)
@@ -135,7 +143,7 @@ main(int argc, char **argv)
 	source.sin_family = AF_INET;
 
 	preload = 1;
-	while ((ch = getopt(argc, argv, COMMON_OPTSTR "bRT:")) != EOF) {
+	while ((ch = getopt(argc, argv, COMMON_OPTSTR "bRT:" "E:")) != EOF) {
 		switch(ch) {
 		case 'b':
 			broadcast_pings = 1;
@@ -214,6 +222,13 @@ main(int argc, char **argv)
 		case 'V':
 			printf("ping utility, iputils-ss%s\n", SNAPSHOT);
 			exit(0);
+		case 'E':
+			is_l2send = 1;
+			if (! conv_macaddress_str_to_bin(optarg, dst_mac)) {
+				fprintf(stderr, "ping: wrong value for -E: MAC-address as XX:XX:XX:XX:XX.\n");
+				exit(2);
+			}
+			break;
 		COMMON_OPTIONS
 			common_options(ch);
 			break;
@@ -223,6 +238,28 @@ main(int argc, char **argv)
 	}
 	argc -= optind;
 	argv += optind;
+
+	if (is_l2send && device == NULL) {
+		fprintf(stderr, "ping: -E option requres -I <device-name> option.\n");
+		exit(2);
+	} else if (is_l2send) {
+		if ((interface_index = get_interface_index(device)) == -1) {
+			fprintf(stderr, "ping: failure to obtain the interface index of %s.\n", device);
+			exit(2);
+		}
+		if ((icmp_l2_sock = l2_socket(interface_index)) == -1) {
+			fprintf(stderr, "ping: failure to create layer 2 socket.\n");
+			exit(2);
+		}
+		if (get_mac_address(device, src_mac) == -1) {
+			fprintf(stderr, "ping: failure to get source mac address of %s.\n", device);
+			exit(2);
+		}
+		if (get_interface_ipaddress(device, &src_ip) == -1) {
+			fprintf(stderr, "ping: failure to get source ip address of %s.\n", device);
+			exit(2);
+		}
+	}
 
 	if (argc == 0)
 		usage();
@@ -666,7 +703,14 @@ int send_probe()
 		m.msg_controllen = cmsg_len;
 		iov.iov_len = cc;
 
-		i = sendmsg(icmp_sock, &m, confirm);
+		if (is_l2send) {
+			i = sendto_icmp_ipv4_l2(
+					interface_index, icmp_l2_sock, dst_mac, src_mac, &whereto, &src_ip, 
+					(struct icmphdr*)&outpack[0], cc);
+			i -= (sizeof(struct ethhdr) + sizeof(struct iphdr));
+		} else {
+			i = sendmsg(icmp_sock, &m, confirm);
+		}
 		confirm = 0;
 	} while (0);
 
