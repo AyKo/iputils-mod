@@ -3,7 +3,7 @@
  * @brief header file of utility functions of the ethernet
  * @author Ayumu Koujiya
  *
- * This souce code is public domain.
+ * This source code is public domain.
  */
 #ifndef ETHER_UTIL_H_
 #define ETHER_UTIL_H_

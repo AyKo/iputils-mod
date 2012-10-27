@@ -38,10 +38,10 @@ install -c clockdiff		${RPM_BUILD_ROOT}%{_sbindir}/
 %ifos linux
 install -c arping               ${RPM_BUILD_ROOT}/sbin/
 ln -s ../../sbin/arping ${RPM_BUILD_ROOT}%{_sbindir}/arping
-install -c ping			${RPM_BUILD_ROOT}/bin/
+install -c ping-mod			${RPM_BUILD_ROOT}/bin/
 %else
 install -c arping		${RPM_BUILD_ROOT}%{_sbindir}/
-install -c ping			${RPM_BUILD_ROOT}%{_sbindir}/
+install -c ping-mod			${RPM_BUILD_ROOT}%{_sbindir}/
 %endif
 install -c ping6		${RPM_BUILD_ROOT}%{_sbindir}/
 install -c rdisc		${RPM_BUILD_ROOT}%{_sbindir}/
@@ -60,12 +60,12 @@ rm -rf ${RPM_BUILD_ROOT}
 %doc RELNOTES doc/*.html
 %{_sbindir}/clockdiff
 %ifos linux
-%attr(4755,root,root)	/bin/ping
+%attr(4755,root,root)	/bin/ping-mo
 /sbin/arping
 %{_sbindir}/arping
 %else
 %{_sbindir}/arping
-%attr(4755,root,root)	%{_sbindir}/ping
+%attr(4755,root,root)	%{_sbindir}/ping-mod
 %endif
 %attr(4755,root,root) %{_sbindir}/ping6
 %{_sbindir}/tracepath
